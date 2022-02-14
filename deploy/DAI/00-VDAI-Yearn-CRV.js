@@ -2,7 +2,7 @@
 
 const VDAI = require('../../helper/ethereum/poolConfig').VDAI
 const Address = require('../../helper/ethereum/address')
-const vsp = '0x1b40183EFB4Dd766f11bDa7A7c3AD8982e998421'
+const vsp = '0x1b40183EFB4Dd766f11bDa7A7c3AD8982e998421' // TODO: change
 const PoolAccountant = 'PoolAccountant'
 const yearnStratDai = 'YearnStrategyDAI'
 const curvStratDai = 'Crv3PoolStrategyDAI'

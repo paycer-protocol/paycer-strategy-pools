@@ -13,6 +13,10 @@ if (process.env.RUN_CONTRACT_SIZER === 'true') {
   require('hardhat-contract-sizer')
 }
 
+const accounts = {
+  mnemonic: process.env.MNEMONIC,
+}
+
 module.exports = {
   defaultNetwork: 'hardhat',
   networks: {
@@ -22,27 +26,31 @@ module.exports = {
     hardhat: {
       initialBaseFeePerGas: 0,
       forking: {
-        url: 'https://mainnet.infura.io/v3/e687cba7b033449abeb865f24ef82f83',
+        url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
         blockNumber: process.env.BLOCK_NUMBER ? parseInt(process.env.BLOCK_NUMBER) : undefined,
       },
       saveDeployments: true,
     },
     mainnet: {
-      url: 'https://mainnet.infura.io/v3/e687cba7b033449abeb865f24ef82f83',
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
       chainId: 1,
       gas: 6700000,
+      accounts,
     },
     polygon: {
-      url: 'https://mainnet.infura.io/v3/e687cba7b033449abeb865f24ef82f83',
+      url: `https://polygon-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
       chainId: 137,
       gas: 11700000,
+      accounts,
     },
   },
   paths: {
     deployments: 'deployments',
   },
   namedAccounts: {
-    deployer: process.env.DEPLOYER || 0,
+    deployer: 0,
+    testAccount: 1,
+    rewardTreasury: 2,
   },
   contractSizer: {
     alphaSort: true,
