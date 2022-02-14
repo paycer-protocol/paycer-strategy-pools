@@ -1,0 +1,34 @@
+name: veWBTC-DAI with Paycer Maker
+on:
+  pull_request:
+    paths:
+      - "test/vwbtc/paycer-earn-maker.js"
+      - "contracts/strategies/Strategy.sol"
+      - "contracts/strategies/maker/MakerStrategy.sol"
+      - "contracts/strategies/maker/earn/EarnPaycerMakerStrategy.sol"
+      - "contracts/strategies/maker/earn/EarnPaycerMakerStrategyWBTC.sol"
+
+jobs:
+  vwbtc-earn-paycer-maker:
+    runs-on: ubuntu-latest
+    env:
+      NODE_URL: ${{ secrets.NODE_URL }}
+    strategy:
+      matrix:
+        node: [14]
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: true
+      - run: cat "${GITHUB_WORKSPACE}/.github/env.properties" >> $GITHUB_ENV
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run npm install with node v${{ matrix.node }}
+        run: npm install
+
+      - name: Running vWBTC-DAI with Paycer Maker
+        run: npm test "test/vwbtc/paycer-earn-maker.js"

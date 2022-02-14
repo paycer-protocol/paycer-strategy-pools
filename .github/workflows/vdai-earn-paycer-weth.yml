@@ -1,0 +1,35 @@
+name: veDAI-WETH with Paycer Strategy
+on:
+  pull_request:
+    paths:
+      - "test/vdai/earn-paycer-dai-weth.js"
+      - "contracts/pool/earn/EarnDrip.sol"
+      - "contracts/strategies/Strategy.sol"
+      - "contracts/strategies/Earn.sol"
+      - "contracts/strategies/paycer/EarnPaycerStrategy.sol"
+      - "contracts/strategies/paycer/EarnPaycerStrategyDAIWETH.sol"
+
+jobs:
+  vdai-earn-paycer-weth:
+    runs-on: ubuntu-latest
+    env:
+      NODE_URL: ${{ secrets.NODE_URL }}
+    strategy:
+      matrix:
+        node: [14]
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: true
+      - run: cat "${GITHUB_WORKSPACE}/.github/env.properties" >> $GITHUB_ENV
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run npm install with node v${{ matrix.node }}
+        run: npm install
+
+      - name: Running veDAI-WETH with Paycer Strategy
+        run: npm test "test/vdai/earn-paycer-dai-weth.js"
