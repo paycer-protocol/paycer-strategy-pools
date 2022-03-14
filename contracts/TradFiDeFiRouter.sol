@@ -11,6 +11,7 @@ import "./strategies/Strategy.sol";
 struct Action {
     uint8 command;
     uint256 amount;
+    address bankManagedAccount;
 }
 
 contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
@@ -29,39 +30,41 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
     constructor(Strategy _strategy, uint256 _depositThreshold) {
         strategy = _strategy;
         depositThreshold = _depositThreshold;
+
+        // initialize Chainlink
+        setPublicChainlinkToken();
+        oracle = 0xc57B33452b4F7BB189bB5AfaE9cc4aBa1f7a4FD8;
+        jobId = "d5270d1c311941d0b08bead21fea7747";
+        fee = 0.1 * 10**18; // (Varies by network and job)
     }
 
     /**
-     * Create a Chainlink request to retrieve API response, find the target
-     * data, then multiply by 1000000000000000000 (to remove decimal places from data).
+     * Create a Chainlink request to retrieve API response
      */
-    function requestVolumeData() public returns (bytes32 requestId) {
-        Chainlink.Request memory request = buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
+    function requestActionFromAPI() public returns (bytes32 requestId) {
+        Chainlink.Request memory request =
+            buildChainlinkRequest(jobId, address(this), this.fulfillMultipleParameters.selector);
 
         // Set the URL to perform the GET request on
         request.add("get", "https://api.paycer.io/api/router/command");
-
-        // Set the path to find the desired data in the API response, where the response format is:
-        // {"RAW":
-        //   {"ETH":
-        //    {"USD":
-        //     {
-        //      "VOLUME24HOUR": xxx.xxx,
-        //     }
-        //    }
-        //   }
-        //  }
-        request.add("path", "RAW.ETH.USD.VOLUME24HOUR");
 
         // Sends the request
         return sendChainlinkRequestTo(oracle, request, fee);
     }
 
     /**
-     * Receive the response in the form of uint256
+     * @notice Fulfillment function for multiple parameters in a single request
+     * @dev This is called by the oracle. recordChainlinkFulfillment must be used.
      */
-    function fulfill(bytes32 _requestId, uint256 _volume) public recordChainlinkFulfillment(_requestId) {
-        // TODO generate withdraw action
+    function fulfillMultipleParameters(
+        bytes32 requestId,
+        uint8 command,
+        uint256 amount,
+        address bankManagedAccount
+    ) public recordChainlinkFulfillment(requestId) {
+        Action memory action = Action({command: command, amount: amount, bankManagedAccount: bankManagedAccount});
+
+        doAction(action);
     }
 
     function checkUpkeep(
@@ -82,16 +85,23 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
     }
 
     function performUpkeep(bytes calldata performData) external override {
+        // get encoded command from performData
         Action memory action = abi.decode(performData, (Action));
 
-        // TODO get encoded command from performData
+        doAction(action);
+    }
+
+    function doAction(Action memory action) internal {
+        // TODO add event
+
+        IERC20 token = strategy.collateralToken();
         if (ACTION_DEPOSIT == action.command) {
-            IERC20 token = strategy.collateralToken();
             token.approve(address(strategy), action.amount);
             //strategy.pool().deposit(action.amount); // FIXME
         } else if (ACTION_WITHDRAW == action.command) {
             strategy.withdraw(action.amount);
-            // TODO send back to bank-managed account
+            // send back to bank-managed account
+            token.transfer(action.bankManagedAccount, action.amount);
         }
     }
 }
