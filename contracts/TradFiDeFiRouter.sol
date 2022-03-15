@@ -91,17 +91,23 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
         doAction(action);
     }
 
-    function doAction(Action memory action) internal {
-        // TODO add event
+    event Deposit(address strategy, uint256 amount);
 
+    event Withdraw(address bankManagedAccount, uint256 amount);
+
+    function doAction(Action memory action) internal {
         IERC20 token = strategy.collateralToken();
         if (ACTION_DEPOSIT == action.command) {
             token.approve(address(strategy), action.amount);
             //strategy.pool().deposit(action.amount); // FIXME
+
+            emit Deposit(address(strategy), action.amount);
         } else if (ACTION_WITHDRAW == action.command) {
             strategy.withdraw(action.amount);
             // send back to bank-managed account
             token.transfer(action.bankManagedAccount, action.amount);
+
+            emit Withdraw(action.bankManagedAccount, action.amount);
         }
     }
 }
