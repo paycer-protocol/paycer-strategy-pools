@@ -6,7 +6,7 @@ pragma solidity 0.8.3;
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./strategies/Strategy.sol";
+import "./pool/VPool.sol";
 
 struct Action {
     uint8 command;
@@ -24,11 +24,11 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
     bytes32 private jobId;
     uint256 private fee;
 
-    Strategy public strategy;
+    VPool public pool;
     uint256 public depositThreshold;
 
-    constructor(Strategy _strategy, uint256 _depositThreshold) {
-        strategy = _strategy;
+    constructor(VPool _pool, uint256 _depositThreshold) {
+        pool = _pool;
         depositThreshold = _depositThreshold;
 
         // initialize Chainlink
@@ -47,6 +47,8 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
 
         // Set the URL to perform the GET request on
         request.add("get", "https://api.paycer.io/api/router/command");
+
+        // TODO check command for correct signature
 
         // Sends the request
         return sendChainlinkRequestTo(oracle, request, fee);
@@ -71,7 +73,7 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
         bytes calldata /* checkData */
     ) external override returns (bool upkeepNeeded, bytes memory performData) {
         // get token balance of router
-        IERC20 token = strategy.collateralToken();
+        IERC20 token = pool;
         uint256 balance = token.balanceOf(address(this));
 
         upkeepNeeded = balance >= depositThreshold;
@@ -91,19 +93,19 @@ contract TradFiDeFiRouter is KeeperCompatibleInterface, ChainlinkClient {
         doAction(action);
     }
 
-    event Deposit(address strategy, uint256 amount);
+    event Deposit(address pool, uint256 amount);
 
     event Withdraw(address bankManagedAccount, uint256 amount);
 
     function doAction(Action memory action) internal {
-        IERC20 token = strategy.collateralToken();
+        IERC20 token = pool;
         if (ACTION_DEPOSIT == action.command) {
-            token.approve(address(strategy), action.amount);
-            //strategy.pool().deposit(action.amount); // FIXME
+            token.approve(address(pool), action.amount);
+            pool.deposit(action.amount);
 
-            emit Deposit(address(strategy), action.amount);
+            emit Deposit(address(pool), action.amount);
         } else if (ACTION_WITHDRAW == action.command) {
-            strategy.withdraw(action.amount);
+            pool.withdraw(action.amount);
             // send back to bank-managed account
             token.transfer(action.bankManagedAccount, action.amount);
 
