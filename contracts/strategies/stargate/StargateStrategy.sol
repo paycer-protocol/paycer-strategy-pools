@@ -22,18 +22,18 @@ abstract contract StargateStrategy is Strategy {
     using SafeERC20 for IERC20;
 
     uint256 internal stakingPoolId;
-    uint256 internal farmingPoolId;
+    uint16 internal farmingPoolId;
     IStargateRouter internal router;
     ILPStaking internal lpStaking;
     IERC20 internal sToken;
-    IERC20 internal STG;
+    address internal STG;
 
     constructor(
         address _pool,
         address _swapManager,
         address _receiptToken,
         uint256 _stakingPoolId,
-        uint256 _farmingPoolId,
+        uint16 _farmingPoolId,
         address _router,
         address _lpStaking,
         address _STG
@@ -46,7 +46,7 @@ abstract contract StargateStrategy is Strategy {
         farmingPoolId = _farmingPoolId;
         router = IStargateRouter(_router);
         lpStaking = ILPStaking(_lpStaking);
-        STG = IERC20(_STG);
+        STG = _STG;
     }
 
     /**
@@ -170,19 +170,16 @@ abstract contract StargateStrategy is Strategy {
      * @return Actual collateral withdrawn
      */
     function _safeWithdraw(uint256 _amount) internal returns (uint256) {
-        ILPStaking.UserInfo memory info = lpStaking.userInfo(stakingPoolId, address(this));
-
-        IPool pool = IFactory(router.factory()).getPool(farmingPoolId);
-
-        uint256 _collateralBalance = info.amount.mul(pool.totalLiquidity()).div(pool.totalSupply()).mul(pool.convertRate());
-
+        (uint256 amount,) = lpStaking.userInfo(stakingPoolId, address(this));
+        uint256 _collateralBalance = _convertToCollateral(amount);
         return _withdrawHere(_amount < _collateralBalance ? _amount : _collateralBalance);
     }
 
     /// @dev Withdraw collateral here. Do not transfer to pool
     function _withdrawHere(uint256 _amount) internal returns (uint256) {
         if (_amount != 0) {
-            uint256 _amountSToken = _amount.mul(pool.totalSupply()).div(pool.totalLiquidity()).div(pool.convertRate());
+            IPool pool = IPool(IFactory(router.factory()).getPool(farmingPoolId));
+            uint256 _amountSToken = _amount * pool.totalSupply() / pool.totalLiquidity() / pool.convertRate();
             lpStaking.withdraw(stakingPoolId, _amountSToken);
             require(router.instantRedeemLocal(farmingPoolId, _amountSToken, address(this)) == 0, "withdraw-from-compound-failed");
             _afterRedeem();
@@ -204,4 +201,9 @@ abstract contract StargateStrategy is Strategy {
      */
     //solhint-disable-next-line no-empty-blocks
     function _afterRedeem() internal virtual {}
+
+    function _convertToCollateral(uint256 _sTokenAmount) internal view returns (uint256) {
+        IPool pool = IPool(IFactory(router.factory()).getPool(farmingPoolId));
+        return _sTokenAmount * pool.totalLiquidity()  * pool.convertRate() / pool.totalSupply();
+    }
 }
